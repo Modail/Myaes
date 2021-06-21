@@ -9,7 +9,6 @@ from tkinter import filedialog
 
 class Application(tk.Tk):
     '''
-    文件夹选择程序
         界面与逻辑分离
     '''
     def __init__(self):
@@ -40,7 +39,7 @@ class Application(tk.Tk):
         cbclabel = tk.Label(cbcframe, text='aes-cbc')
         cbcflabel = tk.Label(cbcframe, text='当前文件:')
         cbcentry = tk.Entry(cbcframe, textvariable=self.cbcentryfilevar)
-        cbcbutton = tk.Button(cbcframe, command=self.__cbcopendir, text='选择')
+        cbcbutton = tk.Button(cbcframe, command=self.__cbcopendir, text='选择文件')
         cbcklabel = tk.Label(cbcframe, text='请输入密钥:')
         cbckeyentry = tk.Entry(cbcframe, textvariable=self.cbcentrykeyvar)
         cbcencryptbutton = tk.Button(cbcframe,
@@ -70,7 +69,7 @@ class Application(tk.Tk):
         cfblabel = tk.Label(cfbframe, text='aes-cfb')
         cfbflabel = tk.Label(cfbframe, text='当前文件:')
         cfbentry = tk.Entry(cfbframe, textvariable=self.cfbentryfilevar)
-        cfbbutton = tk.Button(cfbframe, command=self.__cfbopendir, text='选择')
+        cfbbutton = tk.Button(cfbframe, command=self.__cfbopendir, text='选择文件')
         cfbklabel = tk.Label(cfbframe, text='请输入密钥:')
         cfbkeyentry = tk.Entry(cfbframe, textvariable=self.cfbentrykeyvar)
         cfbencryptbutton = tk.Button(cfbframe,
@@ -101,21 +100,22 @@ class Application(tk.Tk):
         '''打开文件夹的逻辑'''
         self.basename = filedialog.askopenfilename()  # 打开文件夹对话框
         self.cbcentryfilevar.set(
-            self.basename)  # 设置变量...entryfilevar，等同于设置部件...fileEntry
+            self.basename)  # 设置变量...entryfilevar，等同于设置部件...fileEntry的动态数据
         print(self.cbcentryfilevar.get())
 
     def __cbcencrypt(self):
-        startime = time.perf_counter()
+        startime = time.perf_counter()  #调用time库获得加密开始时间
         cbcbytekey = self.cbcentrykeyvar.get().encode(
             'utf-8')  #通过get()将stringvar类型变成string再编码
         cbcmode = pyaes.AESModeOfOperationCBC(cbcbytekey)
-        file_in = open(self.cbcentryfilevar.get(), 'rb')
+        file_in = open(self.cbcentryfilevar.get(),
+                       'rb')  #加b以二进制形式读写，bytes兼容py2、py3
         file_out = open('./passwdency_cbc.txt', 'wb')
         pyaes.encrypt_stream(cbcmode, file_in, file_out)
         file_in.close()
         file_out.close()
-        endtime = time.perf_counter()
-        self.cbc_entime.set(endtime - startime)
+        endtime = time.perf_counter()  #调用time库获得加密结束时间
+        self.cbc_entime.set(endtime - startime)  #设置变量...entime
 
     def __cbcdecrypt(self):
         startime = time.perf_counter()
