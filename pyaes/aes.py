@@ -16,54 +16,54 @@ def _string_to_bytes(text):
     return list(ord(c) for c in text)
 
 
+#py2中返回字符串
 def _bytes_to_string(binary):
     return "".join(chr(b) for b in binary)
 
 
+#将一个列表连接到字节上
 def _concat_list(a, b):
     return a + b
 
 
-# Python 3 compatibility
+# Py3兼容
 try:
     xrange
 except Exception:
     xrange = range
 
-    # Python 3 supports bytes, which is already an array of integers
+    # Py3支持字节，它已经是一个整数数组
     def _string_to_bytes(text):
         if isinstance(text, bytes):
             return text
         return [ord(c) for c in text]
 
-    # In Python 3, we return bytes
+    # py3中，返回bytes
     def _bytes_to_string(binary):
         return bytes(binary)
 
-    # Python 3 cannot concatenate a list onto a bytes, so we bytes-ify it first
+    # Py3不能将一个列表连接到一个字节上，所以对它进行字节化
     def _concat_list(a, b):
         return bytes(a) + bytes(b)
 
 
-# Based *largely* on the Rijndael implementation
-# See: http://csrc.nist.gov/publications/fips/fips197/fips-197.pdf
+# 主要基于Rijndael实现
 class AES(object):
-    '''Encapsulates the AES block cipher.
+    '''封装AES分组密码。
+       通常不需要这个。使用下面AESModeOfOperation类
+    '''
 
-    You generally should not need this. Use the AESModeOfOperation classes
-    below instead.'''
-
-    # Number of rounds by keysize
+    # 根据密钥长度确定加密轮数
     number_of_rounds = {16: 10, 24: 12, 32: 14}
 
-    # Round constant words
+    # 轮常量值表
     rcon = [
         0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8,
         0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4,
         0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91
     ]
 
-    # S-box and Inverse S-box (S is for Substitution)
+    # S盒和逆S盒(S为代换)
     S = [
         0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b,
         0xfe, 0xd7, 0xab, 0x76, 0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0,
@@ -666,32 +666,36 @@ class AES(object):
 
         rounds = self.number_of_rounds[len(key)]
 
-        # Encryption round keys
+        # 加密轮密钥
         self._Ke = [[0] * 4 for i in xrange(rounds + 1)]
 
-        # Decryption round keys
+        # 解密轮密钥
         self._Kd = [[0] * 4 for i in xrange(rounds + 1)]
 
         round_key_count = (rounds + 1) * 4
         KC = len(key) // 4
 
-        # Convert the key into ints
+        # 将密钥的四个字节组成一个字
         tk = [
             struct.unpack('>i', key[i:i + 4])[0]
             for i in xrange(0, len(key), 4)
         ]
 
-        # Copy values into round key arrays
+        # 将值复制到轮密钥数组中
         for i in xrange(0, KC):
             self._Ke[i // 4][i % 4] = tk[i]
             self._Kd[rounds - (i // 4)][i % 4] = tk[i]
 
-        # Key expansion (fips-197 section 5.2)
+        # 密钥扩展
         rconpointer = 0
         t = KC
         while t < round_key_count:
 
+            # 1.字循环：将一个字中的四个字节循环左移一个字节
             tt = tk[KC - 1]
+
+            # 2.字节代换：对字循环结果使用S盒进行字节代换
+            # 3.轮常量异或:前两步结果与轮常量rcon异或
             tk[0] ^= ((self.S[(tt >> 16) & 0xFF] << 24) ^
                       (self.S[(tt >> 8) & 0xFF] << 16) ^
                       (self.S[tt & 0xFF] << 8) ^ self.S[(tt >> 24) & 0xFF] ^
@@ -702,7 +706,7 @@ class AES(object):
                 for i in xrange(1, KC):
                     tk[i] ^= tk[i - 1]
 
-            # Key expansion for 256-bit keys is "slightly different" (fips-197)
+            # 256位的密钥扩展略有不同
             else:
                 for i in xrange(1, KC // 2):
                     tk[i] ^= tk[i - 1]
@@ -716,7 +720,7 @@ class AES(object):
                 for i in xrange(KC // 2 + 1, KC):
                     tk[i] ^= tk[i - 1]
 
-            # Copy values into round key arrays
+            # 将值复制到轮密钥数组中
             j = 0
             while j < KC and t < round_key_count:
                 self._Ke[t // 4][t % 4] = tk[j]
@@ -724,7 +728,7 @@ class AES(object):
                 j += 1
                 t += 1
 
-        # Inverse-Cipher-ify the decryption round key (fips-197 section 5.3)
+        # 对解密轮密钥进行反加密
         for r in xrange(1, rounds):
             for j in xrange(0, 4):
                 tt = self._Kd[r][j]
@@ -734,7 +738,7 @@ class AES(object):
                                   ^ self.U4[tt & 0xFF])
 
     def encrypt(self, plaintext):
-        'Encrypt a block of plain text using the AES block cipher.'
+        '使用AES块密码加密纯文本块'
 
         if len(plaintext) != 16:
             raise ValueError('wrong block length')
@@ -743,11 +747,11 @@ class AES(object):
         (s1, s2, s3) = [1, 2, 3]
         a = [0, 0, 0, 0]
 
-        # Convert plaintext to (ints ^ key)
+        # 将明文转换为(int ^ key)
         t = [(_compact_word(plaintext[4 * i:4 * i + 4]) ^ self._Ke[0][i])
              for i in xrange(0, 4)]
 
-        # Apply round transforms
+        # 进行轮变换
         for r in xrange(1, rounds):
             for i in xrange(0, 4):
                 a[i] = (self.T1[(t[i] >> 24) & 0xFF]
@@ -756,7 +760,7 @@ class AES(object):
                         ^ self.T4[t[(i + s3) % 4] & 0xFF] ^ self._Ke[r][i])
             t = copy.copy(a)
 
-        # The last round is special
+        # 最后一轮有点特别，没有列混合
         result = []
         for i in xrange(0, 4):
             tt = self._Ke[rounds][i]
@@ -770,7 +774,7 @@ class AES(object):
         return result
 
     def decrypt(self, ciphertext):
-        'Decrypt a block of cipher text using the AES block cipher.'
+        '使用AES块密码解密密文块'
 
         if len(ciphertext) != 16:
             raise ValueError('wrong block length')
@@ -779,11 +783,11 @@ class AES(object):
         (s1, s2, s3) = [3, 2, 1]
         a = [0, 0, 0, 0]
 
-        # Convert ciphertext to (ints ^ key)
+        # 将密文转换为 (ints ^ key)
         t = [(_compact_word(ciphertext[4 * i:4 * i + 4]) ^ self._Kd[0][i])
              for i in xrange(0, 4)]
 
-        # Apply round transforms
+        # 进行轮变换
         for r in xrange(1, rounds):
             for i in xrange(0, 4):
                 a[i] = (self.T5[(t[i] >> 24) & 0xFF]
@@ -792,7 +796,7 @@ class AES(object):
                         ^ self.T8[t[(i + s3) % 4] & 0xFF] ^ self._Kd[r][i])
             t = copy.copy(a)
 
-        # The last round is special
+        # 最后一轮有点特别，没有逆列混合
         result = []
         for i in xrange(0, 4):
             tt = self._Kd[rounds][i]
@@ -807,7 +811,7 @@ class AES(object):
 
 
 class AESBlockModeOfOperation(object):
-    '''Super-class for AES modes of operation that require blocks.'''
+    '''需要块的AES操作模式的超类'''
     def __init__(self, key):
         self._aes = AES(key)
 
@@ -819,32 +823,27 @@ class AESBlockModeOfOperation(object):
 
 
 class AESStreamModeOfOperation(AESBlockModeOfOperation):
-    '''Super-class for AES modes of operation that are stream-ciphers.'''
+    '''用于流密码的AES操作模式的超类'''
 
 
 class AESSegmentModeOfOperation(AESStreamModeOfOperation):
-    '''Super-class for AES modes of operation that segment data.'''
+    '''用于段数据的AES操作模式的超类。'''
 
     segment_bytes = 16
 
 
 class AESModeOfOperationCBC(AESBlockModeOfOperation):
-    '''AES Cipher-Block Chaining Mode of Operation.
+    '''AES密码块链接操作模式。
 
-       o The Initialization Vector (IV)
-       o Block-cipher, so data must be padded to 16 byte boundaries
-       o An incorrect initialization vector will only cause the first
-         block to be corrupt; all other blocks will be intact
-       o A corrupt bit in the cipher text will cause a block to be
-         corrupted, and the next block to be inverted, but all other
-         blocks will be intact.
+       o初始化向量(IV)
 
-   Security Notes:
-       o This method (and CTR) ARE recommended.
+       o块密码，所以数据必须填充到16字节
 
-   Also see:
-       o https://en.wikipedia.org/wiki/Block_cipher_mode_of_operation#Cipher-block_chaining_.28CBC.29
-       o See NIST SP800-38A (http://csrc.nist.gov/publications/nistpubs/800-38a/sp800-38a.pdf); section 6.2'''
+       o不正确的初始化向量只会导致第一个块出错;所有其他的块将是完整的
+
+       o密码文本中的损坏位将导致块损坏了，下一个块要倒转，但所有其他块会完好无损。
+
+    '''
 
     name = "Cipher-Block Chaining (CBC)"
 
@@ -883,14 +882,11 @@ class AESModeOfOperationCBC(AESBlockModeOfOperation):
 
 
 class AESModeOfOperationCFB(AESSegmentModeOfOperation):
-    '''AES Cipher Feedback Mode of Operation.
+    '''AES密码反馈操作模式。
 
-       o A stream-cipher, so input does not need to be padded to blocks,
-         but does need to be padded to segment_size
+       o流密码，所以输入不需要填充到块，但是需要填充到segment_size
 
-    Also see:
-       o https://en.wikipedia.org/wiki/Block_cipher_mode_of_operation#Cipher_feedback_.28CFB.29
-       o See NIST SP800-38A (http://csrc.nist.gov/publications/nistpubs/800-38a/sp800-38a.pdf); section 6.3'''
+    '''
 
     name = "Cipher Feedback (CFB)"
 
@@ -907,8 +903,10 @@ class AESModeOfOperationCFB(AESSegmentModeOfOperation):
         self._segment_bytes = segment_size
 
         AESBlockModeOfOperation.__init__(self, key)
-
-    segment_bytes = property(lambda s: s._segment_bytes)
+    
+    #property函数作用是在新式类中返回属性值，lambda定义了一个匿名函数(return x+1)
+    segment_bytes = property(
+        lambda s: s._segment_bytes)
 
     def encrypt(self, plaintext):
         if len(plaintext) % self._segment_bytes != 0:
@@ -917,7 +915,7 @@ class AESModeOfOperationCFB(AESSegmentModeOfOperation):
 
         plaintext = _string_to_bytes(plaintext)
 
-        # Break block into segments
+        # 将块分割成段
         encrypted = []
         for i in xrange(0, len(plaintext), self._segment_bytes):
             plaintext_segment = plaintext[i:i + self._segment_bytes]
@@ -927,7 +925,7 @@ class AESModeOfOperationCFB(AESSegmentModeOfOperation):
                 (p ^ x) for (p, x) in zip(plaintext_segment, xor_segment)
             ]
 
-            # Shift the top bits out and the ciphertext in
+            # 移出顶部位，输入密文
             self._shift_register = _concat_list(
                 self._shift_register[len(cipher_segment):], cipher_segment)
 
@@ -942,7 +940,7 @@ class AESModeOfOperationCFB(AESSegmentModeOfOperation):
 
         ciphertext = _string_to_bytes(ciphertext)
 
-        # Break block into segments
+        # 将块分割成段
         decrypted = []
         for i in xrange(0, len(ciphertext), self._segment_bytes):
             cipher_segment = ciphertext[i:i + self._segment_bytes]
@@ -952,7 +950,7 @@ class AESModeOfOperationCFB(AESSegmentModeOfOperation):
                 (p ^ x) for (p, x) in zip(cipher_segment, xor_segment)
             ]
 
-            # Shift the top bits out and the ciphertext in
+            # 移出顶部位，输入密文
             self._shift_register = _concat_list(
                 self._shift_register[len(cipher_segment):], cipher_segment)
 

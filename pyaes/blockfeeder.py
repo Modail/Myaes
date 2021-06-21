@@ -1,31 +1,22 @@
 from .aes import AESBlockModeOfOperation, AESSegmentModeOfOperation
 from .util import append_PKCS7_padding, strip_PKCS7_padding, to_bufferable
 
-# First we inject three functions to each of the modes of operations
+#首先，我们向每种操作模式注入三个函数
+# _can_consume(大小)
+# 给定一个大小，确定可以消耗多少字节
+# 对解密或加密方法的单独调用
 #
-#    _can_consume(size)
-#       - Given a size, determine how many bytes could be consumed in
-#         a single call to either the decrypt or encrypt method
-#
-#    _final_encrypt(data, padding = PADDING_DEFAULT)
-#       - call and return encrypt on this (last) chunk of data,
-#         padding as necessary; this will always be at least 16
-#         bytes unless the total incoming input was less than 16
-#         bytes
-#
-#    _final_decrypt(data, padding = PADDING_DEFAULT)
-#       - same as _final_encrypt except for decrypt, for
-#         stripping off padding
-#
+# final_encrypt(data, padding = PADDING_DEFAULT)
+# 调用并返回加密对这个(最后)数据块，
+# 填充必要时;它总是至少等于16字节，除非传入的总输入小于16字节
+
+# final_decrypt(data, padding = PADDING_DEFAULT)
+# -与_final_encrypt相同，除了decrypt去掉填充
 
 PADDING_NONE = 'none'
 PADDING_DEFAULT = 'default'
 
-# @TODO: Ciphertext stealing and explicit PKCS#7
-# PADDING_CIPHERTEXT_STEALING
-# PADDING_PKCS7
-
-# CBC are block-only ciphers
+# CBC是块密码
 
 
 def _block_can_consume(self, size):
@@ -33,7 +24,7 @@ def _block_can_consume(self, size):
     return 0
 
 
-# After padding, we may have more than one block
+# 在填充之后，可能有多个块
 def _block_final_encrypt(self, data, padding=PADDING_DEFAULT):
     if padding == PADDING_DEFAULT:
         data = append_PKCS7_padding(data)
@@ -66,14 +57,14 @@ AESBlockModeOfOperation._can_consume = _block_can_consume
 AESBlockModeOfOperation._final_encrypt = _block_final_encrypt
 AESBlockModeOfOperation._final_decrypt = _block_final_decrypt
 
-# CFB is a segment cipher
+# CFB是段密码
 
 
 def _segment_can_consume(self, size):
     return self.segment_bytes * int(size // self.segment_bytes)
 
 
-# CFB can handle a non-segment-sized block at the end using the remaining cipherblock
+# CFB可以使用剩余的密码块在末端处理一个非段大小的块
 def _segment_final_encrypt(self, data, padding=PADDING_DEFAULT):
     if padding != PADDING_DEFAULT:
         raise Exception('invalid padding option')
@@ -84,7 +75,7 @@ def _segment_final_encrypt(self, data, padding=PADDING_DEFAULT):
     return self.encrypt(padded)[:len(data)]
 
 
-# CFB can handle a non-segment-sized block at the end using the remaining cipherblock
+# CFB可以使用剩余的密码块在末端处理一个非段大小的块
 def _segment_final_decrypt(self, data, padding=PADDING_DEFAULT):
     if padding != PADDING_DEFAULT:
         raise Exception('invalid padding option')
@@ -101,9 +92,7 @@ AESSegmentModeOfOperation._final_decrypt = _segment_final_decrypt
 
 
 class BlockFeeder(object):
-    '''The super-class for objects to handle chunking a stream of bytes
-       into the appropriate block size for the underlying mode of operation
-       and applying (or stripping) padding, as necessary.'''
+    '''对象的超类，用于处理将字节流分块为适合底层操作模式的块大小，并根据需要应用(或剥离)填充'''
     def __init__(self, mode, feed, final, padding=PADDING_DEFAULT):
         self._mode = mode
         self._feed = feed
@@ -112,17 +101,14 @@ class BlockFeeder(object):
         self._padding = padding
 
     def feed(self, data=None):
-        '''Provide bytes to encrypt (or decrypt), returning any bytes
-           possible from this or any previous calls to feed.
+        '''提供要加密(或解密)的字节，返回任何字节（可能是这次call或是之前的call）。
 
-           Call with None or an empty string to flush the mode of
-           operation and return any final bytes; no further calls to
-           feed may be made.'''
+           用None或空字符串调用以刷新模式操作并返回任何最终字节;没有更多的call可以进行feed。'''
 
         if self._buffer is None:
             raise ValueError('already finished feeder')
 
-        # Finalize; process the spare bytes we were keeping
+        # 最终; 处理我们保留的空闲字节
         if data is None:
             result = self._final(self._buffer, self._padding)
             self._buffer = None
@@ -130,7 +116,7 @@ class BlockFeeder(object):
 
         self._buffer += to_bufferable(data)
 
-        # We keep 16 bytes around so we can determine padding
+        # 保留16个字节，以便确定填充
         result = to_bufferable('')
         while len(self._buffer) > 16:
             can_consume = self._mode._can_consume(len(self._buffer) - 16)
@@ -142,7 +128,7 @@ class BlockFeeder(object):
 
 
 class Encrypter(BlockFeeder):
-    'Accepts bytes of plaintext and returns encrypted ciphertext.'
+    '接受明文字节并返回加密的密文'
 
     def __init__(self, mode, padding=PADDING_DEFAULT):
         BlockFeeder.__init__(self, mode, mode.encrypt, mode._final_encrypt,
@@ -150,7 +136,7 @@ class Encrypter(BlockFeeder):
 
 
 class Decrypter(BlockFeeder):
-    'Accepts bytes of ciphertext and returns decrypted plaintext.'
+    '接受字节的密文并返回解密的明文'
 
     def __init__(self, mode, padding=PADDING_DEFAULT):
         BlockFeeder.__init__(self, mode, mode.decrypt, mode._final_decrypt,
@@ -162,7 +148,7 @@ BLOCK_SIZE = (1 << 13)
 
 
 def _feed_stream(feeder, in_stream, out_stream, block_size=BLOCK_SIZE):
-    'Uses feeder to read and convert from in_stream and write to out_stream.'
+    '使用feeder读取和转换从in_stream和写入到out_stream'
 
     while True:
         chunk = in_stream.read(block_size)
@@ -179,7 +165,7 @@ def encrypt_stream(mode,
                    out_stream,
                    block_size=BLOCK_SIZE,
                    padding=PADDING_DEFAULT):
-    'Encrypts a stream of bytes from in_stream to out_stream using mode.'
+    '使用模式从in_stream加密字节流到out_stream'
 
     encrypter = Encrypter(mode, padding=padding)
     _feed_stream(encrypter, in_stream, out_stream, block_size)
@@ -190,7 +176,7 @@ def decrypt_stream(mode,
                    out_stream,
                    block_size=BLOCK_SIZE,
                    padding=PADDING_DEFAULT):
-    'Decrypts a stream of bytes from in_stream to out_stream using mode.'
+    '使用模式从in_stream解密字节流到out_stream'
 
     decrypter = Decrypter(mode, padding=padding)
     _feed_stream(decrypter, in_stream, out_stream, block_size)
