@@ -50,7 +50,7 @@ except Exception:
 # 主要基于Rijndael实现
 class AES(object):
     '''封装AES分组密码。
-       通常不需要这个。使用下面AESModeOfOperation类
+       通常不需要这个，使用下面AESModeOfOperation类
     '''
 
     # 根据密钥长度确定加密轮数
@@ -113,7 +113,7 @@ class AES(object):
         0x55, 0x21, 0x0c, 0x7d
     ]
 
-    # Transformations for encryption
+    # 用于加密的轮换
     T1 = [
         0xc66363a5, 0xf87c7c84, 0xee777799, 0xf67b7b8d, 0xfff2f20d, 0xd66b6bbd,
         0xde6f6fb1, 0x91c5c554, 0x60303050, 0x02010103, 0xce6767a9, 0x562b2b7d,
@@ -295,7 +295,7 @@ class AES(object):
         0xb0b0cb7b, 0x5454fca8, 0xbbbbd66d, 0x16163a2c
     ]
 
-    # Transformations for decryption
+    # 用于解密的轮换
     T5 = [
         0x51f4a750, 0x7e416553, 0x1a17a4c3, 0x3a275e96, 0x3bab6bcb, 0x1f9d45f1,
         0xacfa58ab, 0x4be30393, 0x2030fa55, 0xad766df6, 0x88cc7691, 0xf5024c25,
@@ -477,7 +477,7 @@ class AES(object):
         0xcb84617b, 0x32b670d5, 0x6c5c7448, 0xb85742d0
     ]
 
-    # Transformations for decryption key expansion
+    # 用于解密密钥扩展的转换
     U1 = [
         0x00000000, 0x0e090d0b, 0x1c121a16, 0x121b171d, 0x3824342c, 0x362d3927,
         0x24362e3a, 0x2a3f2331, 0x70486858, 0x7e416553, 0x6c5a724e, 0x62537f45,
@@ -903,10 +903,9 @@ class AESModeOfOperationCFB(AESSegmentModeOfOperation):
         self._segment_bytes = segment_size
 
         AESBlockModeOfOperation.__init__(self, key)
-    
+
     #property函数作用是在新式类中返回属性值，lambda定义了一个匿名函数(return x+1)
-    segment_bytes = property(
-        lambda s: s._segment_bytes)
+    segment_bytes = property(lambda s: s._segment_bytes)
 
     def encrypt(self, plaintext):
         if len(plaintext) % self._segment_bytes != 0:
